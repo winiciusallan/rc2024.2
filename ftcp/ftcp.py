@@ -1,5 +1,5 @@
-from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM
-
+import os
+from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 
 class FTCP:
 
@@ -14,32 +14,54 @@ class FTCP:
 
         while True:
             req, addr = self.deal_socket.recvfrom(1024)
-            req = req.decode()
-            break
+            #print(f"udp recebido de {addr}: {req.decode()}")
+            req = req.decode().strip()
 
-        proto, port = self.__negotiate_proto(req, addr)
-        file = req.split(",")[1]
-        res = f"{proto},{port},{file}".encode()
-        self.deal_socket.sendto(res, addr)
+            _, proto, file = [x.strip() for x in req.split(",")]
 
-    def __negotiate_proto(self, req, address) -> tuple:
-        proto = req.split(",")[0].upper()
-        port = -1
+            if proto.upper() != "TCP":
+                res = b"ERROR,PROTOCOLO INVALIDO,,"
+                print(res)
+                self.deal_socket.sendto(res, addr)
+                continue 
 
-        if proto == "TCP":
-            self.__negotiate_tcp(address)
-            port = self.tcp_port
+            if not os.path.exists(file):
+                res = b"ERROR,ARQUIVO NAO ENCONTRADO,,"
+                print(res)
+                self.deal_socket.sendto(res, addr)
+                continue
 
-        if proto == "UDP":
-            port = address[1]
+            proto, port = self.__negotiate_proto(addr, file)
+            res = f"RESPONSE,{proto},{port},{file}".encode()
+            self.deal_socket.sendto(res, addr)
+            self.__negotiate_tcp(addr, file)
 
-        return proto, port
 
-    def __negotiate_tcp(self, address):
-        tcp = self.tcp_socket
-        tcp = socket(AF_INET, SOCK_STREAM)
-        tcp.bind((address[0], self.tcp_port))
-        tcp.listen(1)
+    def __negotiate_proto(self, address, file) -> tuple:
+        port = self.tcp_port
+        return "TCP", port
+
+    def __negotiate_tcp(self, address, file):
+        with socket(AF_INET, SOCK_STREAM) as s:
+            s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+            s.bind(('', self.tcp_port))
+            s.listen(1)
+
+            #print(f"esperando conexão tcp")
+            conn, client_addr = s.accept()
+            #print(f"cliente tcp conectado")
+            self.__handle_connection(conn, file)
+    
+    def __handle_connection(self, conn, file):
+        with open(file, "rb") as f:
+            while True:
+                chunk = f.read(1024)
+                if not chunk:
+                    break
+                conn.sendall(chunk)
+
+        conn.close()
+        print(f"arquivo enviado com sucesso")
 
     def close(self):
         self.deal_socket.close()
