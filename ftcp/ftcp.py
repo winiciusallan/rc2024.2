@@ -1,5 +1,11 @@
+import sys
 import os
 from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from logger_config import setup_logger
+logger = setup_logger(__name__)
 
 class FTCP:
 
@@ -11,31 +17,32 @@ class FTCP:
 
     def bind(self, address: str, port: int):
         self.deal_socket.bind((address, port))
+        logger.info(f"Servidor UDP ligado em {address}:{port}")
 
         while True:
             req, addr = self.deal_socket.recvfrom(1024)
-            #print(f"udp recebido de {addr}: {req.decode()}")
             req = req.decode().strip()
+            logger.debug(f"Solicitação UDP de {addr}: {req}")
 
             _, proto, file = [x.strip() for x in req.split(",")]
 
             if proto.upper() != "TCP":
                 res = b"ERROR,PROTOCOLO INVALIDO,,"
-                print(res)
+                logger.warning(f"Protocolo inválido de {addr}")
                 self.deal_socket.sendto(res, addr)
                 continue 
 
             if not os.path.exists(file):
                 res = b"ERROR,ARQUIVO NAO ENCONTRADO,,"
-                print(res)
+                logger.error(f"Arquivo não encontrado: {file}")
                 self.deal_socket.sendto(res, addr)
                 continue
 
             proto, port = self.__negotiate_proto(addr, file)
             res = f"RESPONSE,{proto},{port},{file}".encode()
+            logger.info(f"Enviando resposta de negociação para {addr}")
             self.deal_socket.sendto(res, addr)
             self.__negotiate_tcp(addr, file)
-
 
     def __negotiate_proto(self, address, file) -> tuple:
         port = self.tcp_port
@@ -47,9 +54,9 @@ class FTCP:
             s.bind(('', self.tcp_port))
             s.listen(1)
 
-            #print(f"esperando conexão tcp")
+            logger.info("Esperando conexão TCP...")
             conn, client_addr = s.accept()
-            #print(f"cliente tcp conectado")
+            logger.info(f"Cliente TCP conectado de {client_addr}")
             self.__handle_connection(conn, file)
     
     def __handle_connection(self, conn, file):
@@ -61,7 +68,8 @@ class FTCP:
                 conn.sendall(chunk)
 
         conn.close()
-        print(f"arquivo enviado com sucesso")
+        logger.info(f"Arquivo '{file}' enviado com sucesso")
 
     def close(self):
         self.deal_socket.close()
+        logger.info("Socket UDP fechado")

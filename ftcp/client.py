@@ -1,7 +1,12 @@
 import sys
+import os
 from socket import socket, AF_INET, SOCK_DGRAM
 from socket import socket as tcp_socket, SOCK_STREAM
 from configparser import ConfigParser
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from logger_config import setup_logger
+logger = setup_logger(__name__)
 
 def usage():
     print("correct usage: python client.py <PROTOCOL> <FILE>")
@@ -30,26 +35,25 @@ def main(args):
     udp_client = socket(AF_INET, SOCK_DGRAM)
 
     msg = f"REQUEST,{proto},{file}".encode()
-    #print(f"enviando mensagem {msg}")
+    logger.debug(f"Enviando mensagem UDP: {msg}")
     udp_client.sendto(msg, ("localhost", get_udp_port()))
-
 
     data, _ = udp_client.recvfrom(1024)
     response = data.decode().strip()
-    #print(f"resposta recebida do servidor {response}")
+    logger.debug(f"Resposta recebida do servidor: {response}")
     
     if response.startswith("ERROR"):
+        logger.error(f"Erro recebido: {response}")
         return
 
     _, proto, port, file = [x.strip() for x in response.split(",")]
 
     if proto.upper() == "TCP":
         client_tcp = tcp_socket(AF_INET, SOCK_STREAM)
-        #print(f"conectando ao servidor tcp")
+        logger.info(f"Conectando ao servidor TCP na porta {port}")
         client_tcp.connect(("127.0.0.1", int(port)))
 
-        #print(f"conectado ao servidor, recebendo arquivo {file}")
-
+        logger.info(f"Conectado. Recebendo arquivo '{file}'")
         with open(f"cliente_{file}", "wb") as f:
             while True:
                 chunk = client_tcp.recv(1024)
@@ -58,7 +62,7 @@ def main(args):
                 f.write(chunk)
 
         client_tcp.close()
-        #print(f"arquivo salvo como 'cliente_{file}' com sucesso")
+        logger.info(f"Arquivo salvo como 'cliente_{file}' com sucesso")
 
 if __name__ == "__main__":
     main(sys.argv)
