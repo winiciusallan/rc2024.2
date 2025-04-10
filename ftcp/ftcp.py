@@ -53,19 +53,18 @@ class FTCP:
         return True
 
     def __send_response(self, addr, file: str):
-        proto, port = self.__negotiate_proto(addr, file)
-        res = f"RESPONSE,{proto},{port},{file}".encode()
+        res = f"RESPONSE, TCP,{self.tcp_port},{file}".encode()
         logger.info(f"Enviando resposta de negociação para {addr}")
         self.socket.sendto(res, addr)
         self.__negotiate_tcp(file)
 
         response = f"RESPONSE,TCP,{self.tcp_port},{file}".encode()
         logger.info(f"Enviando resposta de negociação para {addr}")
-        self.udp_socket.sendto(response, addr)
+        self.socket.sendto(response, addr)
 
     def __send_error(self, message: str, addr):
         error_response = f"ERROR,{message},,".encode()
-        self.udp_socket.sendto(error_response, addr)
+        self.socket.sendto(error_response, addr)
 
     def __negotiate_tcp(self, file):
         with socket(AF_INET, SOCK_STREAM) as server_socket:
