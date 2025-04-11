@@ -1,3 +1,6 @@
+# Arquivos gerados em tempo de execução
+cliente_*.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
