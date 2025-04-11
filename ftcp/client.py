@@ -3,16 +3,14 @@ import os
 from socket import socket, AF_INET, SOCK_DGRAM
 from socket import socket as tcp_socket, SOCK_STREAM
 from configparser import ConfigParser
+from exceptions import (InvalidArgumentsException,
+                        TCPConnectionException, FTCPException)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
-
-
-def usage():
-    print("correct usage: python client.py <PROTOCOL> <FILE>")
 
 
 def get_config():
@@ -27,8 +25,7 @@ def get_udp_port():
 
 def validate_args(args):
     if len(args) != 3:
-        usage()
-        sys.exit(1)
+        raise InvalidArgumentsException("Número incorreto de argumentos. Uso correto: python client.py <PROTOCOL> <FILE>")
 
 
 def get_args(args):
@@ -50,34 +47,40 @@ def request_file_over_udp(proto, file):
 
 
 def handle_tcp_transfer(port, file):
-    with tcp_socket(AF_INET, SOCK_STREAM) as client_tcp:
-        logger.info(f"Conectando ao servidor TCP na porta {port}")
-        client_tcp.connect(("127.0.0.1", int(port)))
-        logger.info(f"Conectado. Recebendo arquivo '{file}'")
+    try:
+        with tcp_socket(AF_INET, SOCK_STREAM) as client_tcp:
+            logger.info(f"Conectando ao servidor TCP na porta {port}")
+            client_tcp.connect(("127.0.0.1", int(port)))
+            logger.info(f"Conectado. Recebendo arquivo '{file}'")
 
-        with open(f"cliente_{file}", "wb") as f:
-            while True:
-                chunk = client_tcp.recv(1024)
-                if not chunk:
-                    break
-                f.write(chunk)
+            with open(f"cliente_{file}", "wb") as f:
+                while True:
+                    chunk = client_tcp.recv(1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
 
-        client_tcp.close()
-        logger.info(f"Arquivo salvo como 'cliente_{file}' com sucesso")
+            client_tcp.close()
+            logger.info(f"Arquivo salvo como 'cliente_{file}' com sucesso")
+    except Exception as e:
+        raise TCPConnectionException(f"Falha na conexão TCP: {str(e)}")
 
 
 def main(args):
-    proto, file = get_args(args)
+    try:
+        proto, file = get_args(args)
+        response = request_file_over_udp(proto, file)
 
-    response = request_file_over_udp(proto, file)
+        if response.startswith("ERROR"):
+            logger.error(f"Erro recebido: {response}")
+            return
 
-    if response.startswith("ERROR"):
-        logger.error(f"Erro recebido: {response}")
-        return
+        _, _, port, file = [x.strip() for x in response.split(",")]
+        handle_tcp_transfer(port, file)
 
-    _, _, port, file = [x.strip() for x in response.split(",")]
-
-    handle_tcp_transfer(port, file)
+    except Exception as e:
+        logger.error(str(e))
+        sys.exit(1)
 
 
 if __name__ == "__main__":
