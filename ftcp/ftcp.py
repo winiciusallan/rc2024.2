@@ -20,6 +20,7 @@ class FTCP:
         logger.info(f"Servidor UDP ligado em {address}:{port}")
 
         while True:
+            logger.debug(f"Ouvindo nova conexão")
             req, addr = self.socket.recvfrom(1024)
 
             self.__handle_request(req.decode().strip(), addr)
@@ -36,7 +37,6 @@ class FTCP:
             return
 
         self.__send_response(addr, file)
-        self.__negotiate_tcp(file)
 
     def __validate_proto(self, proto: str, addr) -> bool:
         if proto.upper() != "TCP":
