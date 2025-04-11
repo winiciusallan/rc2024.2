@@ -18,8 +18,8 @@ class FTCP:
         logger.info(f"Servidor UDP ligado em {address}:{port}")
 
         while True:
-            logger.debug(f"Ouvindo nova conexão")
             req, addr = self.socket.recvfrom(1024)
+            logger.debug(f"Ouvindo nova conexão")
 
             try:
                 self.__handle_request(req.decode().strip(), addr)
@@ -28,7 +28,10 @@ class FTCP:
 
     def __handle_request(self, req: str, addr):
 
-        _, proto, file = [x.strip() for x in req.split(",")]
+        msg, proto, file = [x.strip() for x in req.split(",")]
+
+        if msg == "CONFIRM":
+            return
 
         if not self.__validate_proto(proto, addr):
             return
@@ -80,7 +83,7 @@ class FTCP:
         except Exception as e:
             logger.error(f"Erro na negociação TCP: {str(e)}")
             raise TCPConnectionException(str(e))
-
+        
     def __send_file(self, conn, file):
         with conn, open(file, "rb") as f:
             while True:

@@ -43,6 +43,13 @@ def request_file_over_udp(proto, file):
         return response
 
 
+def send_confirm():
+    with socket(AF_INET, SOCK_DGRAM) as udp_client:
+        msg = f"CONFIRM,UDP,Arquivo recebido".encode()
+        logger.debug(f"Enviando mensagem UDP: {msg}")
+        udp_client.sendto(msg, ("localhost", get_udp_port()))
+    
+
 def handle_tcp_transfer(port, file):
     try:
         with tcp_socket(AF_INET, SOCK_STREAM) as client_tcp:
@@ -58,6 +65,7 @@ def handle_tcp_transfer(port, file):
                     f.write(chunk)
 
             client_tcp.close()
+            send_confirm()
             logger.info(f"Arquivo salvo como 'cliente_{file}' com sucesso")
     except Exception as e:
         raise TCPConnectionException(f"Falha na conexão TCP: {str(e)}")
