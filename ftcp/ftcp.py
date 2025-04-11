@@ -1,9 +1,5 @@
-import sys
 import os
 from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)
@@ -26,7 +22,6 @@ class FTCP:
             self.__handle_request(req.decode().strip(), addr)
 
     def __handle_request(self, req: str, addr):
-        logger.debug(f"Solicitação UDP de {addr}: {req}")
 
         _, proto, file = [x.strip() for x in req.split(",")]
 
