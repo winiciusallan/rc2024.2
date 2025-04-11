@@ -1,11 +1,7 @@
-import sys
-import os
 from ftcp import FTCP
 from configparser import ConfigParser
+
 from exceptions import ServerConfigurationException
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)

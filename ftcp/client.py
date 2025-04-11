@@ -1,13 +1,10 @@
 import sys
-import os
 from socket import socket, AF_INET, SOCK_DGRAM
 from socket import socket as tcp_socket, SOCK_STREAM
 from configparser import ConfigParser
+
 from exceptions import (InvalidArgumentsException,
                         TCPConnectionException, FTCPException)
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from logger_config import setup_logger
 
 logger = setup_logger(__name__)

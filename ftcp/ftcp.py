@@ -1,8 +1,5 @@
-import sys
 import os
 from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from exceptions import InvalidProtocolException, FileNotFoundException, TCPConnectionException
 from logger_config import setup_logger
@@ -30,7 +27,6 @@ class FTCP:
                 logger.error(f"Erro na requisição: {e}")
 
     def __handle_request(self, req: str, addr):
-        logger.debug(f"Solicitação UDP de {addr}: {req}")
 
         _, proto, file = [x.strip() for x in req.split(",")]
 
