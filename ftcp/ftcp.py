@@ -1,5 +1,5 @@
 import os
-from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
+from socket import socket, AF_INET, SOCK_DGRAM, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, SHUT_WR
 
 from exceptions import InvalidProtocolException, FileNotFoundException, TCPConnectionException
 from logger_config import setup_logger
@@ -27,19 +27,22 @@ class FTCP:
                 logger.error(f"Erro na requisição: {e}")
 
     def __handle_request(self, req: str, addr):
+        try:
+            msg, proto, file = [x.strip() for x in req.split(",")]
 
-        msg, proto, file = [x.strip() for x in req.split(",")]
+            if msg == "CONFIRM":
+                return
 
-        if msg == "CONFIRM":
-            return
+            if not self.__validate_proto(proto, addr):
+                return
 
-        if not self.__validate_proto(proto, addr):
-            return
+            if not self.__validate_file(file, addr):
+                return
 
-        if not self.__validate_file(file, addr):
-            return
+            self.__send_response(addr, file)
 
-        self.__send_response(addr, file)
+        except ValueError:
+            logger.error(f"Formato inválido de requisição: {req}")
 
     def __validate_proto(self, proto: str, addr) -> bool:
         if proto.upper() != "TCP":
@@ -56,7 +59,7 @@ class FTCP:
         return True
 
     def __send_response(self, addr, file: str):
-        response = f"RESPONSE,TCP,{self.tcp_port},{file}".encode()
+        response = f"RESPONSE:{self.tcp_port},{file}".encode()
         logger.info(f"Enviando resposta de negociação para {addr}")
         self.socket.sendto(response, addr)
 
@@ -79,20 +82,54 @@ class FTCP:
                 logger.info("Esperando conexão TCP...")
                 conn, client_addr = server_socket.accept()
                 logger.info(f"Cliente TCP conectado de {client_addr}")
-                self.__send_file(conn, file)
+
+                try:
+                    # Receber comando get,arquivo
+                    get_request = conn.recv(1024).decode().strip()
+                    logger.debug(f"Comando recebido: {get_request}")
+
+                    if not get_request.startswith("get,"):
+                        logger.error("Comando inválido recebido.")
+                        conn.close()
+                        return
+
+                    requested_file = get_request.split(",")[1]
+
+                    if requested_file != file:
+                        logger.error("Arquivo solicitado não corresponde ao negociado.")
+                        conn.close()
+                        return
+
+                    # Enviar o arquivo
+                    self.__send_file(conn, file)
+
+                    # Esperar FCP_ACK depois do envio
+                    ack_message = conn.recv(1024).decode().strip()
+                    logger.debug(f"Mensagem FCP_ACK recebida: {ack_message}")
+
+                    if not ack_message.startswith("FCP_ACK,"):
+                        logger.error("ACK inválido recebido.")
+                    else:
+                        bytes_received = ack_message.split(",")[1]
+                        logger.info(f"Cliente confirmou recebimento de {bytes_received} bytes")
+
+                finally:
+                    conn.close()
+                    logger.info("Conexão TCP encerrada com sucesso")
+
         except Exception as e:
             logger.error(f"Erro na negociação TCP: {str(e)}")
             raise TCPConnectionException(str(e))
-        
+
     def __send_file(self, conn, file):
-        with conn, open(file, "rb") as f:
+        with open(file, "rb") as f:
             while True:
                 chunk = f.read(1024)
                 if not chunk:
                     break
                 conn.sendall(chunk)
 
-        conn.close()
+        conn.shutdown(SHUT_WR)
         logger.info(f"Arquivo '{file}' enviado com sucesso")
 
     def close(self):
